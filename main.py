@@ -4,7 +4,7 @@ from typing import List
 class Node:
     char = None
     freq = None
-    bit = None
+    bit = ''
     left_child = None
     right_child = None
 
@@ -13,6 +13,13 @@ class Node:
         self.freq = freq
         self.left_child = left_child
         self.right_child = right_child
+
+    def __repr__(self, level=0):
+        ret = "\t" * level + repr(str(self.char) + ' ' + str(self.freq) + ' ' + self.bit) + "\n"
+        for child in [self.left_child, self.right_child]:
+            if child is not None:
+                ret += child.__repr__(level + 1)
+        return ret
 
 
 def analyze_text(text: str):
@@ -41,15 +48,55 @@ def create_huffman_tree(node_list: List[Node]):
     while len(node_list) > 1:
         left_child = node_list.pop()
         right_child = node_list.pop()
-        left_child.bit = 0
-        left_child.bit = 1
         new_node = Node(freq=left_child.freq + right_child.freq, left_child=left_child, right_child=right_child)
         node_list.append(new_node)
         node_list.sort(key=lambda node: node.freq, reverse=True)
+    set_bits(node_list[0])
+    return node_list[0]
 
 
 def print_tree(node: Node):
     print(node.char, end='')
+
+
+def set_bits(node: Node):
+    if node.left_child is not None:
+        node.left_child.bit += node.bit + '0'
+        set_bits(node.left_child)
+    if node.right_child is not None:
+        node.right_child.bit += node.bit + '1'
+        set_bits(node.right_child)
+
+
+def get_dict_from_tree(node: Node, dictionary=None):
+    if dictionary is None:
+        dictionary = {}
+    if node.char is not None:
+        dictionary[node.char] = node.bit
+        dictionary[node.bit] = node.char
+    if node.left_child is not None:
+        dictionary = get_dict_from_tree(node.left_child, dictionary)
+    if node.right_child is not None:
+        dictionary = get_dict_from_tree(node.right_child, dictionary)
+    return dictionary
+
+
+def encode(text: str, dictionary: dict):
+    result = ''
+    for char in text:
+        result += dictionary[char]
+    return result
+
+
+def decode(text: str, dictionary: dict):
+    result = ''
+    current_bits = ''
+    for bit in text:
+        current_bits += bit
+        if current_bits in dictionary:
+            result += dictionary[current_bits]
+            current_bits = ''
+    return result
 
 
 if __name__ == '__main__':
@@ -57,6 +104,15 @@ if __name__ == '__main__':
 
     nodes = analyze_text(example_text)
     print_node_list(nodes)
-    nodes.sort(key=lambda node: node.freq, reverse=True)
+    nodes = sorted(nodes, key=lambda node: node.freq, reverse=True)
     print_node_list(nodes)
-    create_huffman_tree(nodes)
+    tree = create_huffman_tree(nodes)
+
+    print(nodes)
+    print(get_dict_from_tree(tree))
+
+    encoded = encode(example_text, get_dict_from_tree(tree))
+    decoded = decode(encoded, get_dict_from_tree(tree))
+
+    print(encoded)
+    print(decoded)
