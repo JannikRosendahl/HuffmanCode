@@ -1,3 +1,4 @@
+import pickle
 from typing import List
 
 
@@ -21,7 +22,6 @@ class Node:
                 ret += child.__repr__(level + 1)
         return ret
 
-
 def analyze_text(text: str):
     node_list = []
 
@@ -34,7 +34,6 @@ def analyze_text(text: str):
 
         if not already_in_list:
             node_list.append(Node(char=char, freq=1))
-
     return node_list
 
 
@@ -99,7 +98,17 @@ def decode(text: str, dictionary: dict):
     return result
 
 
-if __name__ == '__main__':
+def save_obj(obj, name):
+    with open('obj/' + name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+
+def load_obj(name):
+    with open('obj/' + name + '.pkl', 'rb') as f:
+        return pickle.load(f)
+
+
+if __name__ == '__main___':
     example_text = 'this is an example of a huffman tree'
 
     nodes = analyze_text(example_text)
@@ -109,10 +118,36 @@ if __name__ == '__main__':
     tree = create_huffman_tree(nodes)
 
     print(nodes)
-    print(get_dict_from_tree(tree))
+    dictionary = get_dict_from_tree(tree)
+    save_obj(dictionary, "example")
 
     encoded = encode(example_text, get_dict_from_tree(tree))
     decoded = decode(encoded, get_dict_from_tree(tree))
 
     print(encoded)
     print(decoded)
+
+
+if __name__ == '__main__':
+    with open('bible.txt', 'r') as file_in:
+        in_string = file_in.read(8)
+        print(in_string)
+
+        #in_string = 'this is an example of a huffman tree'
+
+        nodes = analyze_text(in_string)
+        print_node_list(nodes)
+        nodes = sorted(nodes, key=lambda node: node.freq, reverse=True)
+        print_node_list(nodes)
+        tree = create_huffman_tree(nodes)
+
+        print(nodes)
+        dictionary = get_dict_from_tree(tree)
+        save_obj(dictionary, "example")
+
+        encoded = encode(in_string, get_dict_from_tree(tree))
+        decoded = decode(encoded, get_dict_from_tree(tree))
+
+        print(encoded)
+        print(decoded)
+

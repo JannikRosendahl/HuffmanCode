@@ -5,17 +5,17 @@ debug: bool = True
 
 
 class Node:
-    char = None
-    freq = None
-    code = None
+    char: chr = None
+    freq: int = None
+    code: str = None
     left_child = None
     right_child = None
 
-    def __init__(self, freq, char=None, left_child=None, right_child=None):
-        self.char = char
-        self.freq = freq
-        self.left_child = left_child
-        self.right_child = right_child
+    def __init__(self, freq: int, char: chr = None, left_child=None, right_child=None):
+        self.char: chr = char
+        self.freq: int = freq
+        self.left_child: Node = left_child
+        self.right_child: Node = right_child
         self.code = ''
 
     def get_child_count(self):
@@ -27,7 +27,7 @@ class Node:
         return child_count
 
 
-def print_node(node: Node, print_empty=False):
+def print_node(node: Node, print_empty: bool = False):
     print(
         f"'{node.char}' {node.freq} {node.get_child_count()} '{node.code}'") if node.char is not None or print_empty else ''
     if node.left_child is not None:
@@ -47,7 +47,7 @@ class HuffmanTree:
         if string is not None:
             self.construct_from_string(string)
 
-    def construct_from_string(self, string):
+    def construct_from_string(self, string: str):
         node_list = []
         for char in string:
             node = [node for node in node_list if (node.char == char)]
@@ -96,10 +96,9 @@ class HuffmanTree:
             self.set_code(node.right_child)
 
     def set_dicts(self, node):
-        if node.char is not None and node.code != '':
+        if node.char is not None:
             self.encode_dict[node.char] = node.code
             self.decode_dict[node.code] = node.char
-
         if node.left_child is not None:
             self.set_dicts(node.left_child)
         if node.right_child is not None:
@@ -144,9 +143,12 @@ def test():
 
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser(description='Program to encode or decode a message using a Huffman Tree.')
-    arg_parser.add_argument('-m', '--mode', metavar='Mode', type=str, help='encrypt mode (e)\ndecrypt mode (d)', choices=('e', 'd'))
-    arg_parser.add_argument('-i', '--file-in', metavar='Input File', type=str, help='The file from which input will be read.')
-    arg_parser.add_argument('-o', '--file-out', metavar='Output File', type=str, help='The file where output will be written.')
+    arg_parser.add_argument('-m', '--mode', metavar='Mode', type=str, help='encrypt mode (e)\ndecrypt mode (d)',
+                            choices=('e', 'd'))
+    arg_parser.add_argument('-i', '--file-in', metavar='Input File', type=str,
+                            help='The file from which input will be read.')
+    arg_parser.add_argument('-o', '--file-out', metavar='Output File', type=str,
+                            help='The file where output will be written.')
     arg_parser.add_argument('-d', '--dict', metavar='Dict File', type=str, help='Translation dictionary file path. In '
                                                                                 'encode mode this file will be '
                                                                                 'created/overwritten. In decode mode '
@@ -165,18 +167,17 @@ if __name__ == '__main__':
     if mode == 'e':
         # read file_in
         text_in = open(file_in, 'r').read()
-        print(text_in)
 
         # construct tree
         tree = HuffmanTree(text_in)
 
         # write output
         file_o = open(file_out, 'w')
-        file_o.write(tree.encode(text_in))
+        output = tree.encode(text_in)
+        file_o.write(output)
         file_o.close()
 
         # write dictionary
-
         file_d = open(file_dict, 'wb')
         file_d.write(pickle.dumps(tree.decode_dict))
         file_d.close()
@@ -191,4 +192,3 @@ if __name__ == '__main__':
         text_decoded = tree.decode(text_in)
 
         open(file_out, 'w').write(text_decoded)
-
