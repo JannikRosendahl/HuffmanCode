@@ -1,7 +1,7 @@
 import argparse
 import pickle
 
-debug: bool = True
+debug: bool = False
 
 
 class Node:
@@ -49,6 +49,7 @@ class HuffmanTree:
 
     def construct_from_string(self, string: str):
         node_list = []
+        # node_list.append(Node(0, char=''))
         for char in string:
             node = [node for node in node_list if (node.char == char)]
             node = None if len(node) == 0 else node[0]
@@ -68,7 +69,7 @@ class HuffmanTree:
     def reconstruct_from_file(self, file, dict_file):
         pass
 
-    def tree_from_node_list(self, node_list: list[Node]):
+    def tree_from_node_list(self, node_list):
         while len(node_list) > 1:
             # node_list = sorted(node_list, key=lambda node: node.freq, reverse=True)
             node_list = sorted(node_list, key=lambda node: (node.freq, node.get_child_count()), reverse=True)
@@ -105,7 +106,7 @@ class HuffmanTree:
             self.set_dicts(node.right_child)
 
     def encode(self, string):
-        result = ''
+        result = '1'
         for char in string:
             if char not in self.encode_dict:
                 print(f'error at char \'{char}\', dict not large enough')
@@ -114,16 +115,26 @@ class HuffmanTree:
         return result
 
     def decode(self, string):
+        print(f'first 10 chars of string {string[0:10]}')
+
         result = ''
         sub = ''
-        for char in string:
+        for char in string[1:]:
             sub += char
             if sub in self.decode_dict:
-                result += self.decode_dict[sub]
+                print(f'replacing {sub} with \'{self.decode_dict[sub]}\'') if debug else ''
+                temp = self.decode_dict[sub]
+                if temp == '\0':
+                    return result
+                result += temp
                 sub = ''
         if sub != '':
             print('sub error: ' + sub)
         return result
+
+
+def bitstring_to_bytes(s):
+    return int(s, 2).to_bytes((len(s))// 8, byteorder='big')
 
 
 def test():
@@ -166,15 +177,32 @@ if __name__ == '__main__':
 
     if mode == 'e':
         # read file_in
-        text_in = open(file_in, 'r').read()
+        text_in = open(file_in, 'r', encoding='utf-8').read()
+        text_in += '\0'
 
         # construct tree
         tree = HuffmanTree(text_in)
+        print(tree.encode_dict)
 
         # write output
-        file_o = open(file_out, 'w')
+        file_o = open(file_out, 'wb')
         output = tree.encode(text_in)
-        file_o.write(output)
+        # right pad string with 0s until len(string) is dividable by 8
+        while len(output) % 8 != 0:
+            output += '0'
+            print('right_pad')
+        print(output) if debug else ''
+        byte_array = bitstring_to_bytes(output)
+        #output_utf8 = ''
+        # convert binary encoding to characters to write
+        '''for i in range(len(output)//8):
+            print(output[i * 8:i * 8 + 8]) if debug else ''
+            print(int(output[i * 8:i * 8 + 8], 2)) if debug else ''
+            print(chr(int(output[i * 8:i * 8 + 8], 2))) if debug else ''
+            print('') if debug else ''
+            output_utf8 += chr(int(output[i * 8:i * 8 + 8], 2))'''
+
+        file_o.write(byte_array)
         file_o.close()
 
         # write dictionary
@@ -184,11 +212,22 @@ if __name__ == '__main__':
 
     elif mode == 'd':
         # read file_in
-        text_in = open(file_in, 'r').read()
+        file = open(file_in, 'rb')
+        file.seek(0)
+        text_in = file.read()
+        text_in = '{0:b}'.format(int.from_bytes(text_in, byteorder='big'))
+        print(f'first 10 as string {text_in[:10]}')
+        # convert read chars back to binary
+        '''print(text_in) if debug else ''
+        bin_in = ''.join(format(ord(i), '08b') for i in text_in)
+        print(bin_in) if debug else ''
+        '''
+
         # read dict
         tree = HuffmanTree()
         tree.decode_dict = pickle.loads(open(file_dict, 'rb').read())
+        print(tree.decode_dict)
         # write output
         text_decoded = tree.decode(text_in)
 
-        open(file_out, 'w').write(text_decoded)
+        open(file_out, 'w', encoding='utf-8').write(text_decoded)
