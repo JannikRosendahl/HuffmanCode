@@ -115,7 +115,7 @@ class HuffmanTree:
         return result
 
     def decode(self, string):
-        print(f'first 10 chars of string {string[0:10]}')
+        print(f'type={type(string)} first 10 chars of string {string[0:10]}')
 
         result = ''
         sub = ''
@@ -177,8 +177,8 @@ if __name__ == '__main__':
 
     if mode == 'e':
         # read file_in
-        text_in = open(file_in, 'r', encoding='utf-8').read()
-        text_in += '\0'
+        text_in = open(file_in, 'rb').read()
+        #text_in += '\0'
 
         # construct tree
         tree = HuffmanTree(text_in)
@@ -215,8 +215,8 @@ if __name__ == '__main__':
         file = open(file_in, 'rb')
         file.seek(0)
         text_in = file.read()
-        text_in = '{0:b}'.format(int.from_bytes(text_in, byteorder='big'))
-        print(f'first 10 as string {text_in[:10]}')
+        #text_in = '{0:b}'.format(int.from_bytes(text_in, byteorder='big'))
+        #print(f'first 10 as string {text_in[:10]}')
         # convert read chars back to binary
         '''print(text_in) if debug else ''
         bin_in = ''.join(format(ord(i), '08b') for i in text_in)

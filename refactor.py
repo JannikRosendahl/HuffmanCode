@@ -3,7 +3,7 @@ import pickle
 import threading
 import time
 from typing import Type
-from bitstring import BitArray, BitStream, Bits
+from bitstring import BitArray, BitStream, Bits, ConstBitStream
 
 debug: bool = True
 
@@ -129,32 +129,59 @@ class HuffmanTree:
     def decode(self, data: bytes):
         decoded_data = bytes()
 
-        print(self.decode_dict)
+        bit_data = ConstBitStream(data)
+        bit_data_len = len(bit_data)
+        print(bit_data)
 
-        data_bits = BitArray(data)
-        original_size = len(data_bits)
-        count = 1
+        sub = BitArray
+        bitsread = 0
+        chunk_size = 256
 
-        global thread_size
-        global thread_orig_size
-        thread_orig_size = original_size
+        chunk = bit_data.read(chunk_size)
+        for key in self.decode_dict:
+            if chunk.
 
-        while len(data_bits) > 0 and count < len(data_bits):
-            if Bits(data_bits[:count]) in self.decode_dict:
-                decoded_data += self.decode_dict[Bits(data_bits[:count])]
-                data_bits = data_bits[count:]
-                count = 1
-            else:
-                count += 1
-            thread_size = len(data_bits)
+        '''
+        while bit_data_len - bitsread > chunk_size:
+            chunk = bit_data.read(chunk_size)
+            bitsread += chunk_size
+        '''
 
+
+        '''
+        while bit_data_len - bitsread > chunk_size:
+            chunk = bit_data.read(chunk_size)
+            for bit in chunk:
+                pass
+            bitsread += chunk_size
+        if bit_data_len - bitsread > 0:
+            print(f'{bit_data_len - bitsread} bits left')
+            chunk = bit_data.read(bit_data_len - bitsread)
+        '''
+        '''
+        try:
+            while(True):
+                bit = bit_data.read(256)
+                bitsread += 1*256
+                print(len(bit))
+        except:
+            print(f'reached end {bitsread}')
+        
+        for byte in data:
+            bitsread += 8
+        '''
+
+        print(f'bits read {bitsread}')
         return decoded_data
 
 thread_orig_size = 0
 thread_size = 0
+seconds = 0
 def thread_log():
     while True:
         time.sleep(1)
+        global seconds
+        seconds += 1
         print(f'progress: {thread_size} / {thread_orig_size}')
 
 
@@ -217,6 +244,8 @@ if __name__ == '__main__':
         thread = threading.Thread(target=thread_log, daemon=True)
         thread.start()
         bytes_decoded = tree.decode(bytes_in)
+        print(f'seconds: {seconds}')
+
 
         # write output
         open(file_out, 'wb').write(bytes_decoded)
