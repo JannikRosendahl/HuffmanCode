@@ -1,2 +1,1 @@
-this is an example of a huffman tree
-adding another line to test
+the quick brown fox jumps over the lazy dog

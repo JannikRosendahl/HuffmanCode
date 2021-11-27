@@ -1,170 +1,207 @@
 import argparse
 import pickle
+import threading
+import time
+from bitstring import BitArray, BitStream, Bits, ConstBitStream
 
-debug: bool = False
+debug: bool = True
 
 
 class Node:
-    char: chr = None
-    freq: int = None
-    code: str = None
-    left_child = None
-    right_child = None
+    freq: int
+    data: bytes
+    code = None  # can change type from BitArray to Bits
+    l_child = None
+    r_child = None
 
-    def __init__(self, freq: int, char: chr = None, left_child=None, right_child=None):
-        self.char: chr = char
-        self.freq: int = freq
-        self.left_child: Node = left_child
-        self.right_child: Node = right_child
-        self.code = ''
+    def __init__(self, freq: int, data: bytes = None, l_child=None, r_child=None):
+        self.freq = freq
+        self.data = data
+        self.l_child = l_child
+        self.r_child = r_child
+
+        self.code = BitArray()
 
     def get_child_count(self):
         child_count = 1
-        if self.left_child is not None:
-            child_count += self.left_child.get_child_count()
-        if self.right_child is not None:
-            child_count += self.right_child.get_child_count()
+        if self.l_child is not None:
+            child_count += self.l_child.get_child_count()
+        if self.r_child is not None:
+            child_count += self.r_child.get_child_count()
         return child_count
-
-
-def print_node(node: Node, print_empty: bool = False):
-    print(
-        f"'{node.char}' {node.freq} {node.get_child_count()} '{node.code}'") if node.char is not None or print_empty else ''
-    if node.left_child is not None:
-        print_node(node.left_child)
-    if node.right_child is not None:
-        print_node(node.right_child)
 
 
 class HuffmanTree:
     tree: Node = None
-    encode_dict: dict = None
-    decode_dict: dict = None
+    encode_dict = None  # encode_dict: dict[bytes:Bits] = None
+    decode_dict = None  # decode_dict: dict[Bits:bytes] = None
 
-    def __init__(self, string=None):
-        self.encode_dict = {}
-        self.decode_dict = {}
-        if string is not None:
-            self.construct_from_string(string)
+    data_byte_count = None
+    encoded_bit_count = None
 
-    def construct_from_string(self, string: str):
-        node_list = []
-        # node_list.append(Node(0, char=''))
-        for char in string:
-            node = [node for node in node_list if (node.char == char)]
+    def __init__(self, data: bytes = None):
+        if data is None:
+            return
+        self.data_byte_count = len(data)
+
+        # 1. iterate over data, create Nodes for different bytes
+        node_list: list[Node] = []
+        for byte in data:
+            byte = byte.to_bytes(length=1, byteorder='big')
+            node = [node for node in node_list if node.data == byte]
             node = None if len(node) == 0 else node[0]
             if node is not None:
                 node.freq += 1
             else:
-                node_list.append(Node(1, char))
+                node_list.append(Node(1, byte))
 
-        self.tree_from_node_list(node_list)
+        print(f'finished parsing data, {len(node_list)} different bytes found')
 
-    def reconstruct_from_string(self, string, string_dict):
-        pass
-
-    def construct_from_file(self, file):
-        pass
-
-    def reconstruct_from_file(self, file, dict_file):
-        pass
-
-    def tree_from_node_list(self, node_list):
+        # 2. create tree by combining nodes until only one is left
         while len(node_list) > 1:
-            # node_list = sorted(node_list, key=lambda node: node.freq, reverse=True)
-            node_list = sorted(node_list, key=lambda node: (node.freq, node.get_child_count()), reverse=True)
-
-            node1 = node_list.pop()
-            # print(node1.freq)
-            node2 = node_list.pop()
-            # print(node2.freq)
-
-            # print(f"combining nodes '{node1.char}' + '{node2.char}'")
-
-            node_list.append(Node(node1.freq + node2.freq, left_child=node1, right_child=node2))
-
-        self.set_code(node_list[0])
+            node_list.sort(key=lambda curr_node: (curr_node.freq, curr_node.get_child_count()), reverse=True)
+            l_node, r_node = node_list.pop(), node_list.pop()
+            node_list.append(Node(l_node.freq + r_node.freq, l_child=l_node, r_child=r_node))
         self.tree = node_list.pop()
+
+        # 3. traverse tree to set code. left traversal adds '0' to code, right traversal adds '1'
+        self.set_code(self.tree)
+        if debug:
+            self.print_tree(self.tree)
+
+        self.encode_dict = {}
+        self.decode_dict = {}
         self.set_dicts(self.tree)
+        if debug:
+            print(self.encode_dict)
+            print(self.decode_dict)
 
-    def set_code(self, node):
-        code = node.code
-        if node.left_child is not None:
-            node.left_child.code += code + '0'
-            self.set_code(node.left_child)
-        if node.right_child is not None:
-            node.right_child.code += code + '1'
-            self.set_code(node.right_child)
+    def set_code(self, node: Node):
+        code: BitArray = node.code
+        if node.l_child is not None:
+            # append '0b0' to left child of node
+            node.l_child.code.append(code)
+            node.l_child.code.append('0b0')
+            self.set_code(node.l_child)
+        if node.r_child is not None:
+            # append '0b1' to left child of node
+            node.r_child.code.append(code)
+            node.r_child.code.append('0b1')
+            self.set_code(node.r_child)
 
-    def set_dicts(self, node):
-        if node.char is not None:
-            self.encode_dict[node.char] = node.code
-            self.decode_dict[node.code] = node.char
-        if node.left_child is not None:
-            self.set_dicts(node.left_child)
-        if node.right_child is not None:
-            self.set_dicts(node.right_child)
+    def set_dicts(self, node: Node):
+        if node.data is not None:
+            if type(node.code) is BitArray:
+                node.code = Bits(node.code)
+            self.encode_dict[node.data] = node.code
+            self.decode_dict[node.code] = node.data
+        if node.l_child is not None:
+            self.set_dicts(node.l_child)
+        if node.r_child is not None:
+            self.set_dicts(node.r_child)
 
-    def encode(self, string):
-        result = '1'
-        for char in string:
-            if char not in self.encode_dict:
-                print(f'error at char \'{char}\', dict not large enough')
-                return ''
-            result += self.encode_dict[char]
-        return result
+    def print_tree(self, node: Node):
+        if node.data is not None:
+            print(f'freq: {node.freq} hex: {node.data.hex()} ascii: {node.data} code: {node.code.bin}')
+        if node.l_child is not None:
+            self.print_tree(node.l_child)
+        if node.r_child is not None:
+            self.print_tree(node.r_child)
 
-    def decode(self, string):
-        print(f'type={type(string)} first 10 chars of string {string[0:10]}')
+    def encode(self, data: bytes):
+        encoded_data = BitArray()
 
-        result = ''
-        sub = ''
-        for char in string[1:]:
-            sub += char
-            if sub in self.decode_dict:
-                print(f'replacing {sub} with \'{self.decode_dict[sub]}\'') if debug else ''
-                temp = self.decode_dict[sub]
-                if temp == '\0':
-                    return result
-                result += temp
-                sub = ''
-        if sub != '':
-            print('sub error: ' + sub)
-        return result
+        for byte in data:
+            byte = byte.to_bytes(length=1, byteorder='big')
+
+            if byte not in self.encode_dict:
+                print(f'encode error at \'{byte}\'')
+                return bytes()
+            encoded_data += self.encode_dict[byte]
+
+        self.encoded_bit_count = len(encoded_data)
+
+        # add pad to get a full byte
+        pad_len = len(encoded_data) % 8
+        if pad_len == 0:
+            print('no pad needed')
+        else:
+            bits = None
+            print(f'{pad_len} bits left to full byte')
+            for i in range(2 ** pad_len):
+                bits = Bits(int=i, length=pad_len)
+                valid_pad = True
+                for j in range(pad_len):
+                    piece = Bits(bits[:j + 1])
+                    if piece in self.decode_dict:
+                        valid_pad = False
+                if valid_pad:
+                    break
+
+            encoded_data += bits
+            pad_len = len(encoded_data) % 8
+            print(f'added {bits.bin}, {pad_len} bits left to full byte')
+
+        print(f'data size in bits: {self.data_byte_count*8}, encoded data size in bits: {len(encoded_data)}')
+        print(f'mean code length: {(len(encoded_data)/self.data_byte_count):.2f}')
+
+        return encoded_data.tobytes()
+
+    def decode(self, data: bytes):
+        decoded_data = bytes()
+        bit_stream = ConstBitStream(data)
+        print(f'total bits in stream: {len(bit_stream)}')
+
+        chunk_size = 2 ** 9
+        piece = BitArray()
+        global thread_orig_size
+        thread_orig_size = len(bit_stream)
+        global thread_size
+
+        while bit_stream.pos != len(bit_stream):
+            thread_size = bit_stream.pos
+
+            read_size = chunk_size if len(bit_stream) - bit_stream.pos > chunk_size else len(
+                bit_stream) - bit_stream.pos
+            chunk: BitStream = bit_stream.read(read_size)
+            # print(read_size, chunk)
+
+            piece = BitArray() if len(piece) == 0 else piece
+            while chunk.pos < len(chunk):
+                piece.append(chunk.read(1))
+                piece_as_bits = Bits(piece)
+                if piece_as_bits in self.decode_dict:
+                    decoded_data += self.decode_dict[piece_as_bits]
+                    piece = BitArray()
+
+        return decoded_data
 
 
-def bitstring_to_bytes(s):
-    return int(s, 2).to_bytes((len(s))// 8, byteorder='big')
+thread_orig_size = 0
+thread_size = 0
+seconds = 0
 
 
-def test():
-    huff_string = 'this is an example of a huffman tree'
-    tree = HuffmanTree(huff_string)
-
-    print(tree.encode(huff_string))
-    print(tree.decode(tree.encode(huff_string)))
-
-    string = 'abcdefghijklmnopqrstuvwxyz 1234567890'
-
-    tree = HuffmanTree(string)
-
-    print(tree.encode(string))
-    print(tree.decode(tree.encode(string)))
+def thread_log():
+    while True:
+        time.sleep(.5)
+        global seconds
+        seconds += .5
+        percent = (thread_size / thread_orig_size) * 100
+        print(
+            f'progress: {thread_size:10} / {thread_orig_size} :: {percent:2.2f}%')
 
 
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser(description='Program to encode or decode a message using a Huffman Tree.')
     arg_parser.add_argument('-m', '--mode', metavar='Mode', type=str, help='encrypt mode (e)\ndecrypt mode (d)',
-                            choices=('e', 'd'))
+                            choices=('e', 'd'), required=True)
     arg_parser.add_argument('-i', '--file-in', metavar='Input File', type=str,
-                            help='The file from which input will be read.')
+                            help='The file from which input will be read.', required=True)
     arg_parser.add_argument('-o', '--file-out', metavar='Output File', type=str,
-                            help='The file where output will be written.')
-    arg_parser.add_argument('-d', '--dict', metavar='Dict File', type=str, help='Translation dictionary file path. In '
-                                                                                'encode mode this file will be '
-                                                                                'created/overwritten. In decode mode '
-                                                                                'an existing dictionary file is '
-                                                                                'required for translation.')
+                            help='The file where output will be written.', required=True)
+    arg_parser.add_argument('-d', '--dict', metavar='Dict File', type=str,
+                            help='Translation dictionary file path. In encode mode this file will be created/overwritten. In decode mode an existing dictionary file is required for translation.', required=True)
 
     args = arg_parser.parse_args()
 
@@ -177,32 +214,17 @@ if __name__ == '__main__':
 
     if mode == 'e':
         # read file_in
-        text_in = open(file_in, 'rb').read()
-        #text_in += '\0'
+        bytes_in = open(file_in, 'rb').read()
 
         # construct tree
-        tree = HuffmanTree(text_in)
-        print(tree.encode_dict)
+        tree = HuffmanTree(bytes_in)
+
+        # generate output
+        bytes_encoded = tree.encode(bytes_in)
 
         # write output
         file_o = open(file_out, 'wb')
-        output = tree.encode(text_in)
-        # right pad string with 0s until len(string) is dividable by 8
-        while len(output) % 8 != 0:
-            output += '0'
-            print('right_pad')
-        print(output) if debug else ''
-        byte_array = bitstring_to_bytes(output)
-        #output_utf8 = ''
-        # convert binary encoding to characters to write
-        '''for i in range(len(output)//8):
-            print(output[i * 8:i * 8 + 8]) if debug else ''
-            print(int(output[i * 8:i * 8 + 8], 2)) if debug else ''
-            print(chr(int(output[i * 8:i * 8 + 8], 2))) if debug else ''
-            print('') if debug else ''
-            output_utf8 += chr(int(output[i * 8:i * 8 + 8], 2))'''
-
-        file_o.write(byte_array)
+        file_o.write(bytes_encoded)
         file_o.close()
 
         # write dictionary
@@ -213,21 +235,21 @@ if __name__ == '__main__':
     elif mode == 'd':
         # read file_in
         file = open(file_in, 'rb')
-        file.seek(0)
-        text_in = file.read()
-        #text_in = '{0:b}'.format(int.from_bytes(text_in, byteorder='big'))
-        #print(f'first 10 as string {text_in[:10]}')
-        # convert read chars back to binary
-        '''print(text_in) if debug else ''
-        bin_in = ''.join(format(ord(i), '08b') for i in text_in)
-        print(bin_in) if debug else ''
-        '''
+        bytes_in = file.read()
+
+        # construct empty tree
+        tree = HuffmanTree()
 
         # read dict
-        tree = HuffmanTree()
         tree.decode_dict = pickle.loads(open(file_dict, 'rb').read())
-        print(tree.decode_dict)
-        # write output
-        text_decoded = tree.decode(text_in)
 
-        open(file_out, 'w', encoding='utf-8').write(text_decoded)
+        # generate output
+        print(f'start decoding')
+        thread = threading.Thread(target=thread_log, daemon=True)
+        thread.start()
+        bytes_decoded = tree.decode(bytes_in)
+        print(f'progress: {thread_size:10} / {thread_orig_size} :: {(thread_size / thread_orig_size) * 100:2.2f}%')
+        print(f'seconds: {seconds}')
+
+        # write output
+        open(file_out, 'wb').write(bytes_decoded)
