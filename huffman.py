@@ -35,6 +35,7 @@ class HuffmanTree:
     tree: Node = None
     encode_dict = None  # encode_dict: dict[bytes:Bits] = None
     decode_dict = None  # decode_dict: dict[Bits:bytes] = None
+    code_list = []
 
     data_byte_count = None
     encoded_bit_count = None
@@ -68,6 +69,7 @@ class HuffmanTree:
         self.set_code(self.tree)
         if debug:
             self.print_tree(self.tree)
+            print(self.code_list.sort(key=lambda node: node[0]))
 
         self.encode_dict = {}
         self.decode_dict = {}
@@ -102,7 +104,8 @@ class HuffmanTree:
 
     def print_tree(self, node: Node):
         if node.data is not None:
-            print(f'freq: {node.freq} hex: {node.data.hex()} ascii: {node.data} code: {node.code.bin}')
+            print(f'freq: {node.freq} hex: {node.data.hex()} bin: {Bits(node.data).bin} ascii: {node.data} code: {node.code.bin}')
+            self.code_list.append((node.freq, f'freq: {node.freq} hex: {node.data.hex()} bin: {Bits(node.data).bin} ascii: {node.data} code: {node.code.bin}'))
         if node.l_child is not None:
             self.print_tree(node.l_child)
         if node.r_child is not None:
